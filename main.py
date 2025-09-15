@@ -29,11 +29,11 @@ REQUIRED_COLS = ["nombre", "nivel de dificultad", "subcategoria", "descripción"
 
 def _normalize_row(row: dict) -> dict:
     mapping = {
-        "nombre": ["nombre", "Nombre", "NOMBRE"],
-        "nivel de dificultad": ["nivel de dificultad", "nivel", "Nivel"],
-        "subcategoria": ["subcategoria", "Subcategoria", "SUBCATEGORIA"],
-        "descripción": ["descripción", "descripcion", "Descripcion"],
-        "enlace": ["enlace", "link", "URL"],
+        "nombre": ["nombre", "Nombre", "NOMBRE", "Nombre de la herramienta"],
+        "nivel de dificultad": ["nivel de dificultad", "nivel", "Nivel", "Nivel de dificultad"],
+        "subcategoria": ["subcategoria", "Subcategoria", "SUBCATEGORIA", "Subcategorías"],
+        "descripción": ["descripción", "descripcion", "Descripcion", "Descripción"],
+        "enlace": ["enlace", "link", "URL", "Link"],
         "tutorial": ["tutorial", "Tutorial"],
     }
     norm = {}
