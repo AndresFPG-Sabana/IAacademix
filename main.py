@@ -31,7 +31,7 @@ def _normalize_row(row: dict) -> dict:
     mapping = {
         "nombre": ["nombre", "Nombre", "NOMBRE", "Nombre de la herramienta"],
         "nivel de dificultad": ["nivel de dificultad", "nivel", "Nivel", "Nivel de dificultad"],
-        "subcategoria": ["subcategoria", "Subcategoria", "SUBCATEGORIA", "Subcategorías"],
+        "subcategoria": ["subcategoria", "Subcategoria", "SUBCATEGORIA", "Subcategorías", "Subcategorias"],
         "descripción": ["descripción", "descripcion", "Descripcion", "Descripción"],
         "enlace": ["enlace", "link", "URL", "Link"],
         "tutorial": ["tutorial", "Tutorial"],
