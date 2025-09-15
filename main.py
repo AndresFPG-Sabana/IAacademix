@@ -1,20 +1,19 @@
 import os
 import time
+import csv
+from io import StringIO
 import requests
-import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# === Configuración desde variables de entorno ===
 DATA_URL = os.getenv("DATA_URL", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 MODEL = os.getenv("MODEL", "openai/gpt-oss-20b:free")
 CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "300"))
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
-# === FastAPI ===
-app = FastAPI(title="Recomendador Backend Ligero")
+app = FastAPI(title="Recomendador Backend Ligero (CSV-only)")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,9 +25,9 @@ app.add_middleware(
 
 _cache = {"ts": 0, "rows": []}
 
+REQUIRED_COLS = ["nombre", "nivel de dificultad", "subcategoria", "descripción", "enlace", "tutorial"]
 
-# Normaliza columnas esperadas
-def _normalize(df: pd.DataFrame) -> pd.DataFrame:
+def _normalize_row(row: dict) -> dict:
     mapping = {
         "nombre": ["nombre", "Nombre", "NOMBRE"],
         "nivel de dificultad": ["nivel de dificultad", "nivel", "Nivel"],
@@ -37,18 +36,15 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
         "enlace": ["enlace", "link", "URL"],
         "tutorial": ["tutorial", "Tutorial"],
     }
-    cols = {c: c for c in df.columns}
+    norm = {}
     for target, aliases in mapping.items():
-        for a in aliases:
-            if a in df.columns:
-                cols[a] = target
+        value = ""
+        for key in aliases:
+            if key in row and row[key]:
+                value = str(row[key])
                 break
-    df = df.rename(columns=cols)
-    for c in mapping.keys():
-        if c not in df.columns:
-            df[c] = ""
-    return df[list(mapping.keys())]
-
+        norm[target] = value
+    return norm
 
 def load_data(force: bool = False):
     now = time.time()
@@ -62,27 +58,27 @@ def load_data(force: bool = False):
     if resp.status_code != 200:
         raise RuntimeError(f"No se pudo descargar datos ({resp.status_code})")
 
-    if DATA_URL.lower().endswith(".csv") or "output=csv" in DATA_URL.lower():
-        # read CSV from text content
-        from io import StringIO
-        df = pd.read_csv(StringIO(resp.text))
+    rows = []
+    if DATA_URL.lower().endswith(".json"):
+        data = resp.json()
+        if isinstance(data, dict) and "herramientas" in data:
+            data = data["herramientas"]
+        if not isinstance(data, list):
+            raise RuntimeError("JSON inválido: se esperaba lista o clave 'herramientas'")
+        for r in data:
+            rows.append(_normalize_row(r))
     else:
-        # read Excel from binary content
-        from io import BytesIO
-        df = pd.read_excel(io=BytesIO(resp.content))
-
-    df = _normalize(df)
-    rows = df.fillna("").to_dict(orient="records")
+        reader = csv.DictReader(StringIO(resp.text))
+        for r in reader:
+            rows.append(_normalize_row(r))
 
     _cache["rows"] = rows
     _cache["ts"] = now
     return rows
 
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
 
 @app.get("/datos")
 def datos():
@@ -92,16 +88,13 @@ def datos():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 class ConsultaIn(BaseModel):
     mensaje: str
-
 
 @app.post("/consulta")
 def consulta(body: ConsultaIn):
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY no configurada")
-
     try:
         rows = load_data()
     except Exception as e:
